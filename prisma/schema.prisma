@@ -1,0 +1,662 @@
+// FaithfulMatch.love — Prisma Schema
+// Portable: works with MySQL (MVP/Hostinger) and PostgreSQL (scale).
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum MarriageIntent {
+  READY_NOW
+  WITHIN_ONE_YEAR
+  WITHIN_THREE_YEARS
+  EXPLORING
+}
+
+enum FaithLevel {
+  VERY_ACTIVE
+  ACTIVE
+  GROWING
+  SEEKING
+}
+
+enum ChurchInvolvement {
+  WEEKLY
+  REGULARLY
+  OCCASIONALLY
+  WATCHING_ONLINE
+  NOT_CURRENTLY
+}
+
+enum ProfileVisibilityStatus {
+  DRAFT
+  REVIEW
+  VISIBLE
+  HIDDEN
+  BANNED
+}
+
+enum PhotoModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SwipeAction {
+  LIKE
+  PASS
+  SUPER_LIKE
+}
+
+enum MatchStatus {
+  ACTIVE
+  UNMATCHED
+  BLOCKED
+}
+
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum EventStatus {
+  UPCOMING
+  CANCELLED
+  COMPLETED
+}
+
+enum RsvpStatus {
+  GOING
+  INTERESTED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+// ─── Auth Models ──────────────────────────────────────────────────────────────
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  passwordHash         String?
+  phoneNumberEncrypted String?
+  role                 UserRole  @default(USER)
+  status               UserStatus @default(PENDING_VERIFICATION)
+  emailVerifiedAt      DateTime?
+  phoneVerifiedAt      DateTime?
+  // Marks demo/filler accounts created to populate Discovery before enough
+  // real users exist in a region. Never set via the public API — only by
+  // internal seed scripts. Lets us bulk-hide these later without guessing
+  // which accounts were real vs. seeded (see docs/ops/seed-data-lifecycle.md).
+  isSeedData           Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  sessions             UserSession[]
+  emailVerifications   EmailVerificationToken[]
+  passwordResets       PasswordResetToken[]
+  socialAccounts       SocialAccount[]
+  otpCodes             OtpCode[]
+  profile              Profile?
+  profilePhotos        ProfilePhoto[]
+  preference           Preference?
+  swipesGiven          Swipe[]         @relation("SwiperSwipes")
+  swipesReceived       Swipe[]         @relation("TargetSwipes")
+  matchesAsA           Match[]         @relation("MatchUserA")
+  matchesAsB           Match[]         @relation("MatchUserB")
+  messagesSent         Message[]
+  blocksGiven          Block[]         @relation("BlockerBlocks")
+  blocksReceived       Block[]         @relation("BlockedBlocks")
+  reportsGiven         Report[]        @relation("ReporterReports")
+  reportsReceived      Report[]        @relation("ReportedReports")
+  moderationActions    ModerationAction[] @relation("AdminActions")
+  moderationTargets    ModerationAction[] @relation("TargetActions")
+  notifications        Notification[]
+  deviceTokens         DeviceToken[]
+  auditLogs            AuditLog[]
+  aiMemory             UserAIMemory?
+  profileAnalyses      ProfileAnalysis[]
+  photoAnalyses        PhotoAnalysis[]
+  aiUsageEvents        AICopilotUsage[]
+  eventsOrganized      Event[]         @relation("EventOrganizer")
+  eventRsvps           EventRSVP[]
+  subscription         Subscription?
+  salvationProgress    SalvationProgress?
+
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+model UserSession {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  userAgent        String?   @db.Text
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@map("user_sessions")
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model SocialAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  email             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("social_accounts")
+}
+
+model OtpCode {
+  id          String    @id @default(cuid())
+  userId      String?
+  phoneNumber String
+  purpose     String
+  codeHash    String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([phoneNumber])
+  @@index([userId])
+  @@map("otp_codes")
+}
+
+// ─── Profile Models ───────────────────────────────────────────────────────────
+
+model Profile {
+  id                      String                  @id @default(cuid())
+  userId                  String                  @unique
+  firstName               String?
+  displayName             String?
+  birthday                DateTime?
+  gender                  Gender?
+  denomination            String?
+  churchInvolvement       ChurchInvolvement?
+  faithLevel              FaithLevel?
+  marriageIntent          MarriageIntent?
+  bio                     String?                 @db.Text
+  occupation              String?
+  city                    String?
+  state                   String?
+  country                 String?
+  zip                     String?
+  latitudeApprox          Float?
+  longitudeApprox         Float?
+  boostActiveUntil        DateTime?
+  boostAvailableAt        DateTime?
+  profileCompletionPercent Int                    @default(0)
+  visibilityStatus        ProfileVisibilityStatus @default(DRAFT)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([visibilityStatus])
+  @@index([gender])
+  @@index([marriageIntent])
+  @@map("profiles")
+}
+
+model ProfilePhoto {
+  id               String               @id @default(cuid())
+  userId           String
+  url              String               @db.Text
+  storageKey       String
+  storageProvider  String               @default("local")
+  mimeType         String?
+  sizeBytes        Int?
+  sortOrder        Int                  @default(0)
+  isPrimary        Boolean              @default(false)
+  moderationStatus PhotoModerationStatus @default(PENDING)
+  rejectionReason  String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([moderationStatus])
+  @@map("profile_photos")
+}
+
+model Preference {
+  id                       String    @id @default(cuid())
+  userId                   String    @unique
+  minAge                   Int?
+  maxAge                   Int?
+  maxDistanceMiles         Int?
+  genderPreference         Gender?
+  denominationPreferences  Json?
+  marriageIntentPreferences Json?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("preferences")
+}
+
+// ─── Discovery / Matching Models ──────────────────────────────────────────────
+
+model Swipe {
+  id          String     @id @default(cuid())
+  swiperUserId String
+  targetUserId String
+  action      SwipeAction
+  message     String?    @db.Text
+  createdAt   DateTime   @default(now())
+
+  swiper User @relation("SwiperSwipes", fields: [swiperUserId], references: [id], onDelete: Cascade)
+  target User @relation("TargetSwipes", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperUserId, targetUserId])
+  @@index([swiperUserId])
+  @@index([targetUserId])
+  @@map("swipes")
+}
+
+model Match {
+  id        String     @id @default(cuid())
+  userAId   String
+  userBId   String
+  status    MatchStatus @default(ACTIVE)
+  matchedAt DateTime   @default(now())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  userA        User          @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB        User          @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  conversation Conversation?
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@index([status])
+  @@map("matches")
+}
+
+// ─── Chat Models ──────────────────────────────────────────────────────────────
+
+model Conversation {
+  id            String             @id @default(cuid())
+  matchId       String             @unique
+  status        ConversationStatus @default(ACTIVE)
+  lastMessageAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  match    Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  senderUserId   String
+  content        String      @db.Text
+  messageType    MessageType @default(TEXT)
+  readAt         DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([senderUserId])
+  @@map("messages")
+}
+
+// ─── Safety Models ────────────────────────────────────────────────────────────
+
+model Block {
+  id            String   @id @default(cuid())
+  blockerUserId String
+  blockedUserId String
+  reason        String?
+  createdAt     DateTime @default(now())
+
+  blocker User @relation("BlockerBlocks", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedBlocks", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockerUserId])
+  @@index([blockedUserId])
+  @@map("blocks")
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  reporterUserId String
+  reportedUserId String
+  messageId      String?
+  reason         String
+  details        String?      @db.Text
+  status         ReportStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
+  reviewedAt     DateTime?
+
+  reporter         User               @relation("ReporterReports", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reported         User               @relation("ReportedReports", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  moderationActions ModerationAction[]
+
+  @@index([reporterUserId])
+  @@index([reportedUserId])
+  @@index([status])
+  @@map("reports")
+}
+
+model ModerationAction {
+  id           String   @id @default(cuid())
+  adminUserId  String
+  targetUserId String
+  reportId     String?
+  action       String
+  reason       String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  admin    User    @relation("AdminActions", fields: [adminUserId], references: [id], onDelete: Cascade)
+  target   User    @relation("TargetActions", fields: [targetUserId], references: [id], onDelete: Cascade)
+  report   Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([adminUserId])
+  @@index([targetUserId])
+  @@map("moderation_actions")
+}
+
+// ─── Notification Models ──────────────────────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  channel   String
+  title     String
+  body      String    @db.Text
+  data      Json?
+  status    String    @default("PENDING")
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id         String    @id @default(cuid())
+  userId     String
+  platform   String
+  provider   String
+  token      String    @db.VarChar(512)
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, token])
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+// ─── Audit ────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  metadata  Json?
+  ipAddress String?
+  userAgent String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model UserAIMemory {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  communicationStyle   String?  @db.Text
+  preferredTone        String?
+  relationshipGoal     String?  @db.Text
+  preferredMatchTraits Json?
+  avoidPatterns        Json?
+  successfulPatterns   Json?
+  coachNotes           String?  @db.Text
+  isEnabled            Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_ai_memories")
+}
+
+model ProfileAnalysis {
+  id                          String   @id @default(cuid())
+  userId                      String
+  profileScore                Int
+  matchReadinessScore         Int
+  strengths                   Json
+  weaknesses                  Json
+  suggestedBioNatural         String?  @db.Text
+  suggestedBioPlayful         String?  @db.Text
+  suggestedBioFaithBased      String?  @db.Text
+  suggestedBioMarriageFocused String?  @db.Text
+  createdAt                   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("profile_analyses")
+}
+
+model PhotoAnalysis {
+  id              String   @id @default(cuid())
+  userId          String
+  photoId         String
+  overallScore    Int
+  shouldUse       Boolean  @default(true)
+  bestUse         String?
+  strengths       Json
+  weaknesses      Json
+  improvementTips Json
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([photoId])
+  @@map("photo_analyses")
+}
+
+model AICopilotUsage {
+  id                String   @id @default(cuid())
+  userId            String
+  feature           String
+  isPremiumFeature  Boolean  @default(false)
+  tokensUsed        Int?
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([feature])
+  @@map("ai_copilot_usage")
+}
+
+model Event {
+  id              String      @id @default(cuid())
+  title           String
+  description     String      @db.Text
+  organizerUserId String
+  city            String?
+  state           String?
+  isOnline        Boolean     @default(false)
+  startsAt        DateTime
+  endsAt          DateTime?
+  imageUrl        String?
+  status          EventStatus @default(UPCOMING)
+  // Curated listings for real third-party events (e.g. Eventbrite speed-dating
+  // nights) we don't host or control attendance for. RSVP is disabled in the
+  // UI for these — "attending" only happens on the source platform, never
+  // faked in-app. organizerUserId still points at a system curator account
+  // (FK is required), not the real-world host.
+  isExternal      Boolean     @default(false)
+  externalUrl     String?     @db.Text
+  source          String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  organizer User        @relation("EventOrganizer", fields: [organizerUserId], references: [id], onDelete: Cascade)
+  rsvps     EventRSVP[]
+
+  @@index([startsAt])
+  @@index([status])
+  @@map("events")
+}
+
+model EventRSVP {
+  id        String     @id @default(cuid())
+  eventId   String
+  userId    String
+  status    RsvpStatus @default(GOING)
+  createdAt DateTime   @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@map("event_rsvps")
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  plan             SubscriptionPlan   @default(FREE)
+  status           SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd DateTime?
+  stripeCustomerId String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model SalvationProgress {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  completedSteps Json      @default("[]")
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("salvation_progress")
+}

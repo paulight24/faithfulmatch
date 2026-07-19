@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE `profiles` ADD COLUMN `boostActiveUntil` DATETIME(3) NULL,
+    ADD COLUMN `boostAvailableAt` DATETIME(3) NULL;
+

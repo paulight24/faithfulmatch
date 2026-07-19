@@ -1,32 +1,44 @@
 {
-  "name": "faithfulmatch",
+  "name": "faithfulmatch-api",
   "version": "1.0.0",
-  "description": "",
+  "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "node backend/dist/main.js",
-    "build": "cd backend && npm run build && cd ../frontend && npm run build",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && nest start --watch",
-    "dev:frontend": "cd frontend && next dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "npx prisma generate",
+    "start": "node index.js",
+    "build": "echo Pre-built dist is committed"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@nestjs/common": "^10.4.15",
-    "@nestjs/core": "^10.4.15",
-    "@nestjs/platform-express": "^10.4.15",
-    "next": "^15.1.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "typescript": "^5.7.3"
+    "@aws-sdk/client-s3": "^3.1090.0",
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/platform-socket.io": "^10.4.22",
+    "@nestjs/swagger": "^8.1.1",
+    "@nestjs/throttler": "^6.5.0",
+    "@nestjs/websockets": "^10.4.20",
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "helmet": "^8.1.0",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.7",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "prisma": "^5.22.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.3",
+    "stripe": "^22.3.0",
+    "uuid": "^14.0.0",
+    "web-push": "^3.6.7"
   },
-  "devDependencies": {
-    "@nestjs/cli": "^10.4.9",
-    "@types/node": "^22.10.5",
-    "@types/react": "^19.0.4",
-    "ts-node-dev": "^2.0.0"
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
