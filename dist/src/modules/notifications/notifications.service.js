@@ -18,11 +18,13 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const chat_gateway_1 = require("../messages/chat.gateway");
 const webpush_provider_1 = require("../../infrastructure/push/webpush.provider");
+const fcm_provider_1 = require("../../infrastructure/push/fcm.provider");
 const PAGE_SIZE = 30;
 let NotificationsService = class NotificationsService {
-    constructor(prisma, pushProvider, gateway) {
+    constructor(prisma, pushProvider, fcmProvider, gateway) {
         this.prisma = prisma;
         this.pushProvider = pushProvider;
+        this.fcmProvider = fcmProvider;
         this.gateway = gateway;
     }
     async create(userId, type, title, body, data) {
@@ -40,6 +42,7 @@ let NotificationsService = class NotificationsService {
         });
         this.gateway?.pushToUser(userId, 'notification', notification);
         this.sendWebPush(userId, title, body, data).catch(() => { });
+        this.sendFcmPush(userId, title, body, data).catch(() => { });
         return notification;
     }
     async sendWebPush(userId, title, body, data) {
@@ -59,6 +62,28 @@ let NotificationsService = class NotificationsService {
             }
             catch (err) {
                 if (err instanceof webpush_provider_1.PushSubscriptionGoneError) {
+                    await this.prisma.deviceToken.delete({ where: { id: t.id } }).catch(() => { });
+                }
+            }
+        }));
+    }
+    async sendFcmPush(userId, title, body, data) {
+        if (!this.fcmProvider.isEnabled())
+            return;
+        const tokens = await this.prisma.deviceToken.findMany({
+            where: { userId, provider: 'FCM' },
+        });
+        await Promise.all(tokens.map(async (t) => {
+            try {
+                await this.fcmProvider.sendPush({
+                    deviceToken: t.token,
+                    title,
+                    body,
+                    data: data,
+                });
+            }
+            catch (err) {
+                if (err instanceof fcm_provider_1.FcmTokenGoneError) {
                     await this.prisma.deviceToken.delete({ where: { id: t.id } }).catch(() => { });
                 }
             }
@@ -119,10 +144,11 @@ let NotificationsService = class NotificationsService {
 exports.NotificationsService = NotificationsService;
 exports.NotificationsService = NotificationsService = __decorate([
     (0, common_1.Injectable)(),
-    __param(2, (0, common_1.Optional)()),
-    __param(2, (0, common_1.Inject)((0, common_1.forwardRef)(() => chat_gateway_1.ChatGateway))),
+    __param(3, (0, common_1.Optional)()),
+    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => chat_gateway_1.ChatGateway))),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         webpush_provider_1.WebPushProvider,
+        fcm_provider_1.FcmProvider,
         chat_gateway_1.ChatGateway])
 ], NotificationsService);
 //# sourceMappingURL=notifications.service.js.map

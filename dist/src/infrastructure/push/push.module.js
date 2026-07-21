@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const push_provider_interface_1 = require("./push-provider.interface");
 const webpush_provider_1 = require("./webpush.provider");
+const fcm_provider_1 = require("./fcm.provider");
 let PushModule = class PushModule {
 };
 exports.PushModule = PushModule;
@@ -19,9 +20,10 @@ exports.PushModule = PushModule = __decorate([
         imports: [config_1.ConfigModule],
         providers: [
             webpush_provider_1.WebPushProvider,
+            fcm_provider_1.FcmProvider,
             { provide: push_provider_interface_1.PUSH_PROVIDER, useExisting: webpush_provider_1.WebPushProvider },
         ],
-        exports: [push_provider_interface_1.PUSH_PROVIDER, webpush_provider_1.WebPushProvider],
+        exports: [push_provider_interface_1.PUSH_PROVIDER, webpush_provider_1.WebPushProvider, fcm_provider_1.FcmProvider],
     })
 ], PushModule);
 //# sourceMappingURL=push.module.js.map

@@ -31,6 +31,7 @@ const ai_module_1 = require("./modules/ai/ai.module");
 const events_module_1 = require("./modules/events/events.module");
 const salvation_module_1 = require("./modules/salvation/salvation.module");
 const subscriptions_module_1 = require("./modules/subscriptions/subscriptions.module");
+const legal_module_1 = require("./modules/legal/legal.module");
 const jwt_auth_guard_1 = require("./modules/auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("./modules/auth/guards/roles.guard");
 let AppModule = class AppModule {
@@ -70,6 +71,7 @@ exports.AppModule = AppModule = __decorate([
             events_module_1.EventsModule,
             salvation_module_1.SalvationModule,
             subscriptions_module_1.SubscriptionsModule,
+            legal_module_1.LegalModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },
