@@ -4,6 +4,7 @@ export declare class LocalStorageProvider implements StorageProvider {
     private readonly config;
     private readonly logger;
     private readonly uploadDir;
+    private readonly apiUrl;
     constructor(config: ConfigService);
     private ensureUploadDir;
     uploadFile(params: UploadFileParams): Promise<UploadedFileResult>;

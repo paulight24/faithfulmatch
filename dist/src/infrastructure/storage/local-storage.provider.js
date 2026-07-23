@@ -21,6 +21,7 @@ let LocalStorageProvider = LocalStorageProvider_1 = class LocalStorageProvider {
         this.config = config;
         this.logger = new common_1.Logger(LocalStorageProvider_1.name);
         this.uploadDir = path.resolve(this.config.get('storage.uploadDir') ?? 'uploads');
+        this.apiUrl = this.config.get('apiUrl') ?? '';
         this.ensureUploadDir();
     }
     ensureUploadDir() {
@@ -55,7 +56,7 @@ let LocalStorageProvider = LocalStorageProvider_1 = class LocalStorageProvider {
         }
     }
     getPublicUrl(storageKey) {
-        return `/api/v1/uploads/${storageKey}`;
+        return `${this.apiUrl}/uploads/${storageKey}`;
     }
     async getFileBuffer(storageKey) {
         const filePath = path.join(this.uploadDir, storageKey);

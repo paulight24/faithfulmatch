@@ -6,6 +6,7 @@ export declare class R2StorageProvider implements StorageProvider {
     private readonly s3;
     private readonly bucket;
     private readonly publicUrl;
+    private readonly apiUrl;
     constructor(config: ConfigService);
     uploadFile(params: UploadFileParams): Promise<UploadedFileResult>;
     deleteFile(storageKey: string): Promise<void>;

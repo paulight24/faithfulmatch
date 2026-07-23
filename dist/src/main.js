@@ -9,10 +9,23 @@ const path = require("path");
 const app_module_1 = require("./app.module");
 const http_exception_filter_1 = require("./common/filters/http-exception.filter");
 const transform_interceptor_1 = require("./common/interceptors/transform.interceptor");
+const prisma_service_1 = require("./prisma/prisma.service");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule, { rawBody: true });
     const config = app.get(config_1.ConfigService);
     const reflector = app.get(core_1.Reflector);
+    const apiUrl = config.get('apiUrl');
+    if (apiUrl) {
+        const prisma = app.get(prisma_service_1.PrismaService);
+        const { count } = await prisma.profilePhoto.aggregate({
+            _count: { _all: true },
+            where: { url: { startsWith: '/api/v1/uploads/' } },
+        }).then((r) => ({ count: r._count._all }));
+        if (count > 0) {
+            await prisma.$executeRawUnsafe(`UPDATE profile_photos SET url = CONCAT(?, '/uploads/', storageKey) WHERE url LIKE '/api/v1/uploads/%'`, apiUrl);
+            console.log(`Repaired ${count} profile photo(s) with relative URLs.`);
+        }
+    }
     app.set('trust proxy', 1);
     const storageProvider = config.get('storage.provider') ?? 'local';
     if (storageProvider === 'local') {

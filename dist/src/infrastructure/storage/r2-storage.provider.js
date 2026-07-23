@@ -22,6 +22,7 @@ let R2StorageProvider = R2StorageProvider_1 = class R2StorageProvider {
         this.logger = new common_1.Logger(R2StorageProvider_1.name);
         this.bucket = this.config.getOrThrow('r2.bucket');
         this.publicUrl = this.config.get('r2.publicUrl') ?? '';
+        this.apiUrl = this.config.get('apiUrl') ?? '';
         this.s3 = new client_s3_1.S3Client({
             region: 'auto',
             endpoint: this.config.getOrThrow('r2.endpoint'),
@@ -61,7 +62,7 @@ let R2StorageProvider = R2StorageProvider_1 = class R2StorageProvider {
         if (this.publicUrl) {
             return `${this.publicUrl}/${storageKey}`;
         }
-        return `/api/v1/uploads/${storageKey}`;
+        return `${this.apiUrl}/uploads/${storageKey}`;
     }
     async getFileBuffer(storageKey) {
         const response = await this.s3.send(new client_s3_1.GetObjectCommand({
